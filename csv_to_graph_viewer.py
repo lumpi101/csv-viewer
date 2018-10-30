@@ -38,6 +38,7 @@ def timestampConversion(dataFrame, assumeTimestamp=False, inplace=False):
     if not inplace:
         dataFrame = dataFrame.copy()
     df = dataFrame
+    accomplished = False
 
     if str(df.dtypes[0]) != 'datetime64[ns]' and (assumeTimestamp or re.match(r"timestamp|unix.*time.*|posix.*time.*", df.columns[0], re.IGNORECASE)):
         try:
@@ -50,15 +51,19 @@ def timestampConversion(dataFrame, assumeTimestamp=False, inplace=False):
                     factor = {'D': 0, 's': 1, 'ms': 10**3, 'us': 10**6, 'ns': 10**9}[unit]
                     msDiff = sample.replace(tzinfo=du.tz.tzutc()).astimezone(du.tz.gettz('Europe/Berlin')).utcoffset().total_seconds() * factor
                     df.iloc[:,0] = pd.to_datetime(df.iloc[:,0] + msDiff, unit=unit)
+                    accomplished = True
                     break
             else:
                 df.iloc[:,0] = pd.to_datetime(df.iloc[:,0])
+                accomplished = True
         except:
             if assumeTimestamp:
                 raise NoTimestampError
     
     if not inplace:
-        return df
+        return df, accomplished
+    else:
+        return accomplished
 
 def getData(path, separator=None, convertTimestamps=False, assumeTimestamp=False):
 
@@ -71,7 +76,7 @@ def getData(path, separator=None, convertTimestamps=False, assumeTimestamp=False
         df = pd.read_csv(path, sep=delimiter, na_values=['Infinity', '-Infinity'], encoding='latin-1')
     
     if convertTimestamps:
-        timestampConversion(df, assumeTimestamp=assumeTimestamp, inplace=True)
+        return df, timestampConversion(df, assumeTimestamp=assumeTimestamp, inplace=True)
 
     return df
 
@@ -154,9 +159,10 @@ def calculateIntegral(x_data, y_data, interpolate_method='constant'):
     return integral
 
 class App:
-    def __init__(self, master, dataFrame):
+    def __init__(self, master, dataFrame, timestamped):
         self.noFeature = "-- no feature --"
         self.df = dataFrame
+        self.timestamped = timestamped
         self.labels = list(self.df.columns)
         self.shortenLabels()
         self.features = [self.noFeature] + self.labels
@@ -233,17 +239,19 @@ class App:
             fOptionMenus.pop()
     
     def shortenLabels(self):
+        h = 1 if self.timestamped else 0
         longVersionLabels = self.labels[:]
-        n = len(self.labels) - 1
-        i = 0
-        for i, z in enumerate(zip(*self.labels[1:])):
-            if z.count(z[0]) != n:
-                break
-        if i > 0:
-            if len(self.labels[0]) > i and self.labels[0][:i] == self.labels[1][:i]:
-                self.labels[0] = self.labels[0][i:]
-            for j in range(1, len(self.labels)):
-                self.labels[j] = self.labels[j][i:]
+        n = len(self.labels) - h
+        if n > 1:
+            i = 0
+            for i, z in enumerate(zip(*self.labels[h:])):
+                if z.count(z[0]) != n:
+                    break
+            if i > 0:
+                # if len(self.labels[0]) > i and self.labels[0][:i] == self.labels[1][:i]:
+                #     self.labels[0] = self.labels[0][i:]
+                for j in range(h, len(self.labels)):
+                    self.labels[j] = self.labels[j][i:]
         self.longVersionLabels = {z[0]:z[1] for z in zip(self.labels, longVersionLabels)}
     
     def plot(self):
@@ -278,13 +286,13 @@ class App:
 
 def view(dataframeOrPath):
     if type(dataframeOrPath) is str:
-        df = getData(dataframeOrPath, convertTimestamps=True)
+        df, detectedTimestamp = getData(dataframeOrPath, convertTimestamps=True)
     else:
-        df = dataframeOrPath
+        df, detectedTimestamp = dataframeOrPath, False
     # print(df.dtypes)
     
     root = tk.Tk()
-    App(root, df)
+    App(root, df, detectedTimestamp)
     root.mainloop()
 
 if __name__ == '__main__':
