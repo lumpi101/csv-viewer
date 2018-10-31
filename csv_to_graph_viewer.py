@@ -8,6 +8,7 @@ Created on Thu Dec 21 13:11:13 2017
 import multiprocessing
 import sys
 import matplotlib.pyplot as plt
+from tkinter import filedialog
 import tkinter as tk
 import numpy as np
 import pandas as pd
@@ -297,7 +298,7 @@ def view(dataframeOrPath):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        sys.argv.append(tk.filedialog.askopenfilename(filetypes=(("CSV File", "*.csv *.txt *.ascii"), ("All Files", "*.*")), title = "Choose a file"))
+        sys.argv.append(filedialog.askopenfilename(filetypes=(("CSV File", "*.csv *.txt *.ascii"), ("All Files", "*.*")), title = "Choose a file"))
     if sys.argv[-1] == '':
         exit(0)
     view(sys.argv[1])
